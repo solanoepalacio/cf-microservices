@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Stateless web-app generic insfrastructure example.
+  Inspired in Architecture presented in course "Ultimate AWS Certified Solutions Architect Associate 2020" by Stephane Marek (Udemy)
+
+Parameters:
+  EC2KeyName:
+    Type: String
+    Description: AWS SSH Key Name
+  NodeServerUserData:
+    Type: String
+    Description: >
+      Install nodejs server that logs locally to the instance and responds with the hostname
+
+Resources: 
+  StatelessWebappTestInstance: 
+    Type: "AWS::EC2::Instance"
+    Properties:
+      KeyName:
+        Ref: EC2KeyName
+      ImageId: "ami-04b202bf877b5027b"
+      InstanceType: t2.micro
+      UserData:
+        Ref: NodeServerUserData
+      AvailabilityZone: "sa-east-1a"
