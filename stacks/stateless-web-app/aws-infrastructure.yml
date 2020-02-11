@@ -18,8 +18,24 @@ Resources:
     Properties:
       KeyName:
         Ref: EC2KeyName
-      ImageId: "ami-04b202bf877b5027b"
+      ImageId: "ami-04b202bf877b5027b" # aws linux 2
       InstanceType: t2.micro
       UserData:
         Ref: NodeServerUserData
       AvailabilityZone: "sa-east-1a"
+      SecurityGroups:
+      - !Ref PublicSecurityGroup
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Allow SSH from anywhere
+      GroupName: PublicSecurityGroup
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
