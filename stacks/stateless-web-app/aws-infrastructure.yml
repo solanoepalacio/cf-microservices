@@ -12,8 +12,70 @@ Parameters:
     Description: >
       Install nodejs server that logs locally to the instance and responds with the hostname
 
-Resources: 
-  StatelessWebappTestInstance: 
+Resources:
+  # DNS ===============
+
+  PublicDNS:
+    Type: AWS::Route53::RecordSet
+    Properties: 
+      HostedZoneName: solano.be.
+      Name: stateless-web-app.solano.be.
+      Region: "sa-east-1"
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneNameID
+        DNSName: !GetAtt LoadBalancer.DNSName
+      SetIdentifier: Stateless-web-app 
+
+
+
+  # Security Groups ===============
+
+  LBIngress:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Allow traffic from LB to EC2
+      GroupName: LBIngress
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+
+  InstanceSSH:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: API service EC2 instance ssh access
+      GroupName: ServiceInstance
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          SourceSecurityGroupName: !Ref LBIngress
+
+  # Load Balancer ===============
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Instances:
+        - Ref: StatelessWebappTestInstance
+      AvailabilityZones:
+        - sa-east-1a
+      SecurityGroups:
+        - !GetAtt LBIngress.GroupId
+      Listeners:
+        - LoadBalancerPort: '80'
+          InstancePort: '80'
+          Protocol: HTTP
+  
+  # EC2 Instances ===============
+
+  StatelessWebappTestInstance:
     Type: "AWS::EC2::Instance"
     Properties:
       KeyName:
@@ -24,49 +86,5 @@ Resources:
         Ref: NodeServerUserData
       AvailabilityZone: "sa-east-1a"
       SecurityGroups:
-      - !Ref PublicSecurityGroup
-  PublicSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties: 
-      GroupDescription: Allow SSH from anywhere
-      GroupName: PublicSecurityGroup
-      SecurityGroupIngress: 
-        - IpProtocol: tcp
-          FromPort: '22'
-          ToPort: '22'
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: 0.0.0.0/0
-  PublicSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties: 
-      GroupDescription: Allow SSH from anywhere
-      GroupName: PublicSecurityGroup
-      SecurityGroupIngress: 
-        - IpProtocol: tcp
-          FromPort: '22'
-          ToPort: '22'
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: 0.0.0.0/0
-  LoadBalancer:
-    Type: AWS::ElasticLoadBalancing::LoadBalancer
-    Properties:
-      AvailabilityZones:
-      - "sa-east-1a"
-      Instances:
-      - Ref: StatelessWebappTestInstance
-      Listeners:
-      - LoadBalancerPort: '80'
-        InstancePort: '80'
-        Protocol: HTTP
-      HealthCheck:
-        Target: HTTP:80/
-        HealthyThreshold: '3'
-        UnhealthyThreshold: '5'
-        Interval: '30'
-        Timeout: '5'
+      - !Ref InstanceSSH
+ 
