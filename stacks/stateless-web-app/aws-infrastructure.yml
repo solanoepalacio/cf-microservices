@@ -27,8 +27,6 @@ Resources:
         DNSName: !GetAtt LoadBalancer.DNSName
       SetIdentifier: Stateless-web-app 
 
-
-
   # Security Groups ===============
 
   LBIngress:
