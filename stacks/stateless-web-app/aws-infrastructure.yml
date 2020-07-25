@@ -23,9 +23,19 @@ Resources:
       Region: "sa-east-1"
       Type: A
       AliasTarget:
-        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneNameID
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
         DNSName: !GetAtt LoadBalancer.DNSName
-      SetIdentifier: Stateless-web-app 
+      SetIdentifier: Stateless-web-app
+
+  # Security Groups ===============
+  MainVPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: false
+      EnableDnsSupport: false
+      InstanceTenancy: default
+
 
   # Security Groups ===============
 
@@ -34,6 +44,7 @@ Resources:
     Properties: 
       GroupDescription: Allow traffic from LB to EC2
       GroupName: LBIngress
+      VpcId: !Ref MainVPC
       SecurityGroupIngress: 
         - IpProtocol: tcp
           FromPort: '80'
@@ -45,6 +56,7 @@ Resources:
     Properties: 
       GroupDescription: API service EC2 instance ssh access
       GroupName: ServiceInstance
+      VpcId: !Ref MainVPC
       SecurityGroupIngress: 
         - IpProtocol: tcp
           FromPort: '22'
@@ -58,22 +70,56 @@ Resources:
   # Load Balancer ===============
 
   LoadBalancer:
-    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Instances:
-        - Ref: StatelessWebappTestInstance
-      AvailabilityZones:
-        - sa-east-1a
       SecurityGroups:
         - !GetAtt LBIngress.GroupId
-      Listeners:
-        - LoadBalancerPort: '80'
-          InstancePort: '80'
-          Protocol: HTTP
+      Subnets:
+        - !Ref: subnet-1
+        - !Ref: subnet-2
+
+  WebListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: 
+        - Type: forward
+          TargetGroupArn: !Ref ServicesTargetGroup
   
+  ServicesTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      VpcId: !Ref MainVPC
+      Name: ServicesTargetGroup
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      Targets: 
+        - Port: 80
+          AvailabilityZone: sa-east-1a
+          Id: !Ref EC2ServiceInstance
+
+  # Auto Scaling Group ==============
+
+  ServiceASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: 
+      MaxSize: '3'
+      MinSize: '1'
+      DesiredCapacity: '2'
+      AutoScalingGroupName: Stateless-web-app-asg
+      AvailabilityZones: 
+        - sa-east-1a
+      Cooldown: '600'
+      HealthCheckGracePeriod: 120
+      TargetGroupARNs:
+        - !Ref ServicesTargetGroup
+
   # EC2 Instances ===============
 
-  StatelessWebappTestInstance:
+  EC2ServiceInstance:
     Type: "AWS::EC2::Instance"
     Properties:
       KeyName:
